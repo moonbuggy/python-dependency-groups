@@ -18,7 +18,7 @@ then it can be imported into the cryptography build.
 import re
 import sys
 import signal
-import requests
+from requests_cache import CachedSession
 from toposort import toposort
 
 
@@ -34,8 +34,10 @@ signal.signal(signal.SIGINT, signal_handler)
 class PythonModule():
     """A python module."""
 
-    def __init__(self, mod_string):
+    def __init__(self, mod_string, ses):
         """Populate self with relevant module data."""
+        self.ses = ses
+
         self.parse_mod_string(mod_string)
         self.get_api_data()
         self.set_self()
@@ -68,10 +70,9 @@ class PythonModule():
         if not self.data or not self.data['info']['requires_dist']:
             self.data = self.get_url(self.name)
 
-    @classmethod
-    def get_url(cls, url):
+    def get_url(self, url):
         """Get JSON data from PyPi API."""
-        res = requests.get('https://pypi.org/pypi/' + url + '/json')
+        res = self.ses.get('https://pypi.org/pypi/' + url + '/json')
         res.raise_for_status()
         return res.json()
 
@@ -95,7 +96,7 @@ class PythonModule():
         self.name_ver_lower = self.name_ver.lower()
 
 
-def add_modules(mods, mod_dict, dep_tree):
+def add_modules(mods, mod_dict, dep_tree, ses):
     """
     Add modules from a list or set.
 
@@ -105,8 +106,7 @@ def add_modules(mods, mod_dict, dep_tree):
     """
     recurse_mods = set()
     for mod_string in mods:
-        print('mod_string:', mod_string)
-        mod = PythonModule(mod_string)
+        mod = PythonModule(mod_string, ses)
 
         if mod.name_ver_lower in mod_dict.keys():
             continue
@@ -116,7 +116,7 @@ def add_modules(mods, mod_dict, dep_tree):
         recurse_mods.update(mod.deps)
 
     if recurse_mods:
-        add_modules(recurse_mods, mod_dict, dep_tree)
+        add_modules(recurse_mods, mod_dict, dep_tree, ses)
 
 
 def main():
@@ -126,7 +126,9 @@ def main():
 
     arg_modules = sys.argv[1:]
 
-    add_modules(arg_modules, mod_dict, dep_tree)
+    ses = CachedSession(backend='memory')
+
+    add_modules(arg_modules, mod_dict, dep_tree, ses)
 
     for group in toposort(dep_tree):
         group = [x if x not in mod_dict else mod_dict[x] for x in group]
