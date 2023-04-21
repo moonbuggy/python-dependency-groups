@@ -18,18 +18,18 @@ is convenient for handling in shell scripts.
 Use the standalone script (after installing `requirements.txt`) or the Docker
 image in the same way:
 
-```
+```sh
 ./pydepgroups.py <mods>
 
 # .. or ..
 
-docker run --rm moonbuggy2000/python-depenency-groups <mods>
+docker run --rm moonbuggy2000/python-dependency-groups <mods>
 ```
 Where `<mods>` is a space separated string of module names.
 
 The output will use module names from the PyPi API, which may result in the
 case changing from the input, as with _PyNaCl_ in this example:
-```
+```sh
 $ ./pydepgroups.py cryptography paramiko pynacl
 bcrypt pycparser PyNaCl six
 cffi
@@ -43,7 +43,7 @@ Modules specified with a version number will be returned with the version number
 intact.
 
 For example (note that this older _paramiko_ version doesn't depend on _six_):
-```
+```sh
 $ ./pydepgroups.py cryptography paramiko-2.7.2 pynacl
 bcrypt pycparser PyNaCl
 cffi
@@ -52,7 +52,7 @@ paramiko-2.7.2
 ```
 
 A practical application in a shell script:
-```
+```sh
 #! /bin/bash
 
 modules="cryptography paramiko PyNaCl"
