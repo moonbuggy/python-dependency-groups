@@ -18,6 +18,7 @@ then it can be imported into the cryptography build.
 import re
 import sys
 import signal
+from requests.exceptions import HTTPError
 from requests_cache import CachedSession
 from toposort import toposort
 
@@ -64,11 +65,15 @@ class PythonModule():
         Try for version-specific deps, fall back to the global deps.
         """
         self.data = None
-        if self.version:
-            self.data = self.get_url(self.name + '/' + self.version)
-
-        if not self.data or not self.data['info']['requires_dist']:
-            self.data = self.get_url(self.name)
+        try:
+            if self.version:
+                self.data = self.get_url(self.name + '/' + self.version)
+            if not self.data or not self.data['info']['requires_dist']:
+                self.data = self.get_url(self.name)
+        except HTTPError as err:
+            print(f'Error getting API data: {self.name}: {err}',
+                  file=sys.stderr)
+            sys.exit(1)
 
     def get_url(self, url):
         """Get JSON data from PyPi API."""
@@ -81,13 +86,20 @@ class PythonModule():
         Set self variables from API data.
 
         Use the module name from the API, to get the correct case.
+
+        If a module version is "greater than or equal to", strip the version
+        from the string so downstream will default to the latest version. If
+        "less than or equal to", convert to "equals to".
         """
         self.name = self.data['info']['name']
 
         self.deps = set()
         deps = self.data['info']['requires_dist']
+
         if deps:
-            self.deps = [x.split(' ', 1)[0] for x in deps if ";" not in x]
+            self.deps = [x.replace('<=', '-') for x in
+                         [x.split('>=', 1)[0] for x in
+                         [x.split(' ', 1)[0] for x in deps if ";" not in x]]]
 
         if self.version:
             self.name_ver = self.name + '-' + self.version
